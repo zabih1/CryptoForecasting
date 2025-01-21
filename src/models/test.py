@@ -16,13 +16,13 @@ def evaluate_model(model_path, test_data_path):
     r2 = r2_score(y_test, predictions)
     return {"MSE": mse, "MAE": mae, "R2": r2}
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-#     btc_model_path = "artifacts/btc_model.pkl"  
-#     btc_test_data_path = "data/processed_data/btcusdt_1d_processed.csv"  
+    btc_model_path = "artifacts/eth_model.pkl"  
+    btc_test_data_path = "data/processed_data/btcusdt_1d_processed.csv"  
 
-#     metrics = evaluate_model(btc_model_path, btc_test_data_path)
+    metrics = evaluate_model(btc_model_path, btc_test_data_path)
     
-#     print("Evaluation Results:")
-#     for metric, value in metrics.items():
-#         print(f"{metric}: {value}")
+    print("Evaluation Results:")
+    for metric, value in metrics.items():
+        print(f"{metric}: {value}")
