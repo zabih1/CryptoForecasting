@@ -26,17 +26,5 @@ def save_processed_data(df, base_path, symbol, interval):
     df.to_csv(path, index=False)
     return path
 
-# def main():
-    
-#     raw_data_path = "data/raw_data"
-#     processed_data_path = "data/processed_data"
 
-#     for symbol in ['BTCUSDT', 'ETHUSDT']:
-#         interval = '1d'
-#         raw_data = load_raw_data(raw_data_path, symbol, interval)
-#         processed_data = process_data(raw_data)
-#         processed_file = save_processed_data(processed_data, processed_data_path, symbol, interval)
-#         print(f"Processed data saved at: {processed_file}")
 
-# if __name__ == "__main__":
-#     main()

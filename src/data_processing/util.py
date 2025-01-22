@@ -21,13 +21,5 @@ def save_to_csv(df, symbol, interval, base_path):
     df.to_csv(path, index=False)
     return path
 
-# base_path = os.path.join("data", "raw_data")
 
-# btc_data = get_data('BTCUSDT', '1d')
-# eth_data = get_data('ETHUSDT', '1d')
 
-# btc_path = save_to_csv(btc_data, 'BTCUSDT', '1d', base_path)
-# eth_path = save_to_csv(eth_data, 'ETHUSDT', '1d', base_path)
-
-# print(f"Bitcoin data saved at: {btc_path}")
-# print(f"Ethereum data saved at: {eth_path}")

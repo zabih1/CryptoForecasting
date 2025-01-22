@@ -1,3 +1,6 @@
+
+
+
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -48,11 +51,4 @@ def train_model(data_path, model_path, model_type='linear'):
 
 
 
-# BASE_DIR = Path("crypto_forecasting_project")
-# PROCESSED_DATA_DIR = BASE_DIR / "data/processed_data"
-# ARTIFACTS_DIR = BASE_DIR / "artifacts"
 
-# btc_data_path = "data/processed_data/btcusdt_1d_processed.csv"
-# btc_model_path = "artifacts/btc_model.pkl"
-
-# train_model(btc_data_path, btc_model_path, model_type='xgboost')
