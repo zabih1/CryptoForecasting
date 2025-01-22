@@ -1,6 +1,6 @@
 # CryptoForecasting
 
-CryptoForecasting is a machine learning project aimed at predicting cryptocurrency prices for Bitcoin (BTC) and Ethereum (ETH). The project leverages advanced data processing techniques and machine learning models to provide accurate forecasts based on historical market data.
+CryptoForecasting is a machine learning project aimed at predicting cryptocurrency prices for Bitcoin (BTC) and Ethereum (ETH). The project leverages machine learning models to provide accurate forecasts based on historical market data.
 
 ---
 
