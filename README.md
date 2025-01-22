@@ -7,27 +7,29 @@ CryptoForecasting is a machine learning project aimed at predicting cryptocurren
 ## Project Structure
 
 ```
+
 CryptoForecasting/
-├── artifacts/                 # Directory for saved models
-├── data/                      # Data directory
-│   ├── raw_data/              # Contains raw dataset files
-│   ├── processed_data/        # Contains preprocessed dataset files
-├── notebook/                  # Contains Jupyter notebooks for experimentation
-├── src/                       # Source code directory
-│   ├── data_processing/       # Scripts for data processing
-│   │   ├── util.py            # Utility functions for data handling
-│   │   ├── preprocessing.py   # Data preprocessing logic
-│   ├── models/                # Model-related scripts
-│   │   ├── modeltraining.py   # Model training code
-│   │   ├── testing.py         # Model evaluation code
-│   ├── prediction_pipeline/   # Prediction pipeline scripts
-│       ├── btc_prediction.py  # BTC prediction pipeline
-│       ├── eth_prediction.py  # ETH prediction pipeline
-│       ├── prediction_pipeline.py # General prediction pipeline
-├── .gitignore                 # Git ignore file
-├── README.md                  # Project documentation
-├── requirements.txt           # Python dependencies
-├── inference.py               # Script for inference using trained models
+├── artifacts/
+├── data/
+│   ├── raw_data/
+│   ├── processed_data/
+├── notebook/
+├── src/
+│   ├── data_processing/
+│   │   ├── util.py
+│   │   ├── preprocessing.py
+│   ├── models/
+│   │   ├── modeltraining.py
+│   │   ├── testing.py
+│   ├── prediction_pipeline/
+│       ├── btc_prediction.py
+│       ├── eth_prediction.py
+│       ├── prediction_pipeline.py
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── inference.py
+
 ```
 
 ---
@@ -45,7 +47,7 @@ CryptoForecasting/
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/CryptoForecasting.git
+   git clone https://github.com/zabih1/CryptoForecasting.git
    ```
 2. Navigate to the project directory:
    ```bash
