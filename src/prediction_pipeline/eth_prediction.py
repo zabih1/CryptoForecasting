@@ -1,7 +1,15 @@
+import sys
+import os
+
+# Add paths for custom modules
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data_processing')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models')))
+
 from src.data_processing.util import get_data, save_to_csv
 from src.data_processing.preprocessing import process_data, save_processed_data
 from src.models.modeltraining import train_model
-import os
+
 
 def eth_prediction_pipeline():
     # Define paths and parameters

@@ -6,23 +6,14 @@
 import sys
 import os
 
+# Add paths for custom modules
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data_processing')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models')))
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
-
-from util import get_data, save_to_csv
-from modeltraining import train_model
-
-
-
-
 
 from src.data_processing.util import get_data, save_to_csv
 from src.data_processing.preprocessing import process_data, save_processed_data
 from src.models.modeltraining import train_model
-import os
 
 
 def btc_prediction_pipeline():
@@ -47,6 +38,8 @@ def btc_prediction_pipeline():
     trained_model = train_model(processed_data_path, model_path, model_type='xgboost')
     print(f"Bitcoin model trained and saved at: {model_path}")
 
-# Run the pipeline
-if __name__ == "__main__":
-    btc_prediction_pipeline()
+
+
+# # Run the pipeline
+# if __name__ == "__main__":
+#     btc_prediction_pipeline()
