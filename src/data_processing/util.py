@@ -2,8 +2,8 @@ import pandas as pd
 import requests
 import os
 
-def get_data(symbol, interval):
-    url = f'https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}'
+def get_data(symbol, interval, limit=1000):
+    url = f'https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}'
     response = requests.get(url)
     data = response.json()
     columns = ['Open Time', 'Open', 'High', 'Low', 'Close', 'Volume', 
