@@ -65,21 +65,14 @@ To train the model, modify and run the `modeltraining.py` script in the `src/mod
 
 ### Predict Cryptocurrency Prices
 Use the prediction pipelines:
-- **Bitcoin Prediction**:
-  ```bash
-  python src/prediction_pipeline/btc_prediction.py
-  ```
-- **Ethereum Prediction**:
-  ```bash
-  python src/prediction_pipeline/eth_prediction.py
-  ```
-- **General Prediction**:
+
+- **Coin Prediction**:
   ```bash
   python src/prediction_pipeline/prediction_pipeline.py
   ```
 
 ### Running Inference
-Use the `inference.py` script to generate predictions from saved models:
+Use the `inference.py` script to generate `close price ` predictions from saved models:
 ```bash
 python inference.py
 ```
