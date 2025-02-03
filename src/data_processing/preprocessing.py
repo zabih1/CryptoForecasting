@@ -17,6 +17,9 @@ def process_data(df):
     df['Volume'] = pd.to_numeric(df['Volume'])
     df['Average Price'] = (df['High'] + df['Low']) / 2
     df['Price Change'] = df['Close'] - df['Open']
+    df['year'] = df['Open Time'].dt.year  
+    df['month'] = df['Open Time'].dt.month  
+    df['day'] = df['Open Time'].dt.day
     return df
 
 def save_processed_data(df, base_path, symbol, interval):

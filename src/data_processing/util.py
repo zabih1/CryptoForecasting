@@ -9,9 +9,11 @@ def get_data(symbol, interval, limit=1000):
     columns = ['Open Time', 'Open', 'High', 'Low', 'Close', 'Volume', 
                'Close Time', 'Quote Asset Volume', 'Number of Trades', 
                'Taker Buy Base Volume', 'Taker Buy Quote Volume', 'Ignore']
+    
     df = pd.DataFrame(data, columns=columns)
     df['Open Time'] = pd.to_datetime(df['Open Time'], unit='ms')
     df['Close Time'] = pd.to_datetime(df['Close Time'], unit='ms')
+    
     return df
 
 def save_to_csv(df, symbol, interval, base_path):
