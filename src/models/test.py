@@ -1,6 +1,5 @@
 import pandas as pd
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import pickle
 from pathlib import Path
@@ -15,18 +14,19 @@ def evaluate_model(model_path, data_path):
     data = pd.read_csv(data_path)
 
     features = ['Open', 'High', 'Low', 'Volume', 'Average Price', 'Price Change']
-
-    target = 'Close' 
+    target = 'Close'  
 
     X = data[features]
     y = data[target]
 
-    _, X_test, _, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+    split_ratio = 0.8  # 80% train, 20% test (time-based split)
+    split_point = int(len(data) * split_ratio)
+
+    X_train, X_test = X.iloc[:split_point], X.iloc[split_point:]
+    y_train, y_test = y.iloc[:split_point], y.iloc[split_point:]
 
     scaler = StandardScaler()
-
-    X_test = scaler.fit_transform(X_test)
-    y_test = scaler.fit_transform(y_test.values.reshape(-1,1))
+    X_test = scaler.fit_transform(X_test)  # Apply scaler to test features only
 
     y_pred = model.predict(X_test)
 
@@ -41,13 +41,11 @@ def evaluate_model(model_path, data_path):
     print("-" * 50)
 
 if __name__ == "__main__":
-
     models = [
         "artifacts/btcusdt_1d_linear_model.pkl",
         "artifacts/btcusdt_1d_xgboost_model.pkl",
         "artifacts/ethusdt_1d_linear_model.pkl",
         "artifacts/ethusdt_1d_xgboost_model.pkl",
-   
     ]
 
     test_data_path = "data/processed_data/btcusdt_1d_processed.csv"  
