@@ -3,104 +3,121 @@ import pickle
 import warnings
 import requests
 import logging
-from datetime import datetime
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
-# Configure logging
+#----------------------------Logging Configuration-----------------------------------------
 logging.basicConfig(
     filename="predictions.log",
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+#----------------------------Model and Scaler Loading Functions-----------------------------------------
 def load_model(model_path):
-    """Load a model from the specified file path using pickle."""
-    try:
-        with open(model_path, "rb") as f:
-            model = pickle.load(f)
-        return model
-    except FileNotFoundError:
-        logging.error(f"Model file not found: {model_path}")
-        raise
-    except Exception as e:
-        logging.error(f"Error loading model: {e}")
-        raise
+    with open(model_path, "rb") as f:
+        model = pickle.load(f)
+    return model
 
+def load_scaler(scaler_path):
+    with open(scaler_path, "rb") as f:
+        scaler = pickle.load(f)
+    return scaler
 
-def get_binance_data(symbol, interval, limit=1):
-    """Fetch the latest market data from Binance API."""
+#----------------------------Data Fetching, Processing, and Prediction Functions-----------------------------------------
+def get_data(symbol, interval='1d', start_date="2023-01-01", end_date="2025-02-06", limit=1000):
     url = f'https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}'
-    try:
-        response = requests.get(url)
-        response.raise_for_status()  
-        data = response.json()[0]
+    
+    if start_date:
+        url += f'&startTime={int(pd.Timestamp(start_date).timestamp() * 1000)}'
+    if end_date:
+        url += f'&endTime={int(pd.Timestamp(end_date).timestamp() * 1000)}'
+    
+    response = requests.get(url)
+    
+    if response.status_code != 200:
+        raise Exception(f'Error fetching data: {response.status_code} - {response.text}')
+    
+    data = response.json()
+    
+    if not data:
+        raise Exception("No data returned from Binance API.")
+    
+    df = pd.DataFrame(data, columns=[
+        'timestamp', 'open', 'high', 'low', 'close', 'volume',
+        'close_time', 'quote_asset_volume', 'number_of_trades',
+        'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
+    ])
 
-        return {
-            "Open Time": int(data[0]),  
-            "Open": float(data[1]),
-            "High": float(data[2]),
-            "Low": float(data[3]),
-            "Close": float(data[4]),
-            "Volume": float(data[5]),
-            "Quote Asset Volume": float(data[7]),
-            "Number of Trades": int(data[8]),
-            "Taker Buy Base Volume": float(data[9]),
-            "Taker Buy Quote Volume": float(data[10]),
-            "Average Price": (float(data[1]) + float(data[4])) / 2,  # (Open + Close) / 2
-            "Price Change": float(data[4]) - float(data[1])  # Close - Open
-        }
-    except requests.exceptions.RequestException as e:
-        logging.error(f"API request failed: {e}")
-        raise
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+    df.set_index('timestamp', inplace=True)
+    df.drop(columns=['close_time', 'ignore'], inplace=True)
+    
+    # Convert relevant columns to numeric
+    numeric_cols = ['open', 'high', 'low', 'close', 'volume',
+                    'quote_asset_volume', 'number_of_trades',
+                    'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume']
+    df[numeric_cols] = df[numeric_cols].astype(float)
 
-
-
-
-def process_input_data(input_data):
-    """Process the input data to match the model's expected feature format."""
-    df = pd.DataFrame([input_data])
-
-    df = df.drop(columns=["Open Time"], errors="ignore")
-
-    df['Average Price'] = (df['High'] + df['Low']) / 2
-    df['Price Change'] = df['Close'] - df['Open']
-
-    timestamp = pd.to_datetime(input_data["Open Time"], unit='ms')
-    df['year'] = timestamp.year
-    df['month'] = timestamp.month
-    df['day'] = timestamp.day
+    # Add new features used during training
+    df['price_range'] = df['high'] - df['low']
+    df['close_to_open'] = df['close'] - df['open']
 
     return df
 
+def process_input_data(df, scaler):
+    features = ['open', 'high', 'low', 'volume', 'quote_asset_volume',
+                'number_of_trades', 'taker_buy_base_asset_volume',
+                'taker_buy_quote_asset_volume', 'price_range', 'close_to_open']
+    
+    latest_data = df[features].iloc[-1, :].values.reshape(1, -1)
 
+    df = df[features]
+    latest_data_df = pd.DataFrame([df.iloc[-1]], columns=df.columns)
+    
+    scaled_data = scaler.transform(latest_data_df)
 
-def predict_close_price(model, input_data):
-    """Predict the closing price using the specified model and processed input data."""
-    df = process_input_data(input_data)
-    prediction = model.predict(df)[0]
-    return prediction
+    return scaled_data
 
+def predict_close_price(model, scaler, input_data):
+    processed_data = process_input_data(input_data, scaler)
+    prediction = model.predict(processed_data)
+    return prediction[0]
+
+# Main function
 if __name__ == "__main__":
-    btc_linear_model_path = "artifacts/btcusdt_1d_linear_model.pkl"
-    eth_linear_model_path = "artifacts/ethusdt_1d_linear_model.pkl"
+    artifacts_dir = Path('artifacts')
+    model_dir = artifacts_dir / 'model'
+    scaler_dir = artifacts_dir / 'scaler'
+    
+    model_dir.mkdir(parents=True, exist_ok=True)
+    scaler_dir.mkdir(parents=True, exist_ok=True)
 
-    try:
-        btc_input_data = get_binance_data("BTCUSDT", "1d")
-        eth_input_data = get_binance_data("ETHUSDT", "1d")
+    btc_model_path = model_dir / "btcusdt_1d_linear_model.pkl"
+    eth_model_path = model_dir / "ethusdt_1d_linear_model.pkl"
+    btc_scaler_path = scaler_dir / "btcusdt_1d_scaler.pkl"
+    eth_scaler_path = scaler_dir / "ethusdt_1d_scaler.pkl"
 
-        btc_linear_model = load_model(btc_linear_model_path)
-        eth_linear_model = load_model(eth_linear_model_path)
+    btc_model = load_model(btc_model_path)
+    eth_model = load_model(eth_model_path)
+    
+    btc_scaler = load_scaler(btc_scaler_path)
+    eth_scaler = load_scaler(eth_scaler_path)
 
-        btc_linear_prediction = predict_close_price(btc_linear_model, btc_input_data)
-        eth_linear_prediction = predict_close_price(eth_linear_model, eth_input_data)
+    expected_features = btc_scaler.feature_names_in_  
+    print(expected_features)
 
-        print(f"Predicted Bitcoin Closing Price (Linear Model): {btc_linear_prediction}")
-        print(f"Predicted Ethereum Closing Price (Linear Model): {eth_linear_prediction}")
+    btc_input_data = get_data(symbol='BTCUSDT', interval='1d')
+    eth_input_data = get_data(symbol='ETHUSDT', interval='1d')
 
-        logging.info(f"BTCUSDT Prediction: {btc_linear_prediction}")
-        logging.info(f"ETHUSDT Prediction: {eth_linear_prediction}")
+    btc_prediction = predict_close_price(btc_model, btc_scaler, btc_input_data)
+    eth_prediction = predict_close_price(eth_model, eth_scaler, eth_input_data)
 
-    except Exception as e:
-        logging.error(f"Error occurred: {e}")
-        print(f"Error: {e}")
+    print(f"Predicted Bitcoin Closing Price (Next Day): {btc_prediction}")
+    print(f"Predicted Ethereum Closing Price (Next Day): {eth_prediction}")
+
+    logging.info(f"BTCUSDT Next Day Prediction: {btc_prediction}")
+    logging.info(f"ETHUSDT Next Day Prediction: {eth_prediction}")
