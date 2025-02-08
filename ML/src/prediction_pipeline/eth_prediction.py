@@ -12,12 +12,12 @@ from src.data_processing.util import get_data, save_to_csv
 from src.data_processing.preprocessing import process_data, save_processed_data
 from src.models.modeltraining import train_model
 
-#---------------------BTC Prediction Pipeline-------------------------------
-def btc_prediction_pipeline(symbol, interval, start_date, end_date):
+#---------------------ETH Prediction Pipeline-------------------------------
+def eth_prediction_pipeline(symbol, interval, start_date, end_date):
     """
-    Full prediction pipeline for a given cryptocurrency symbol and interval.
+    Full prediction pipeline for Ethereum (ETH) based on the given interval.
     """
-    base_dir = Path('.')
+    base_dir = Path('./ML')
     raw_data_base_path = base_dir / 'data/raw_data'
     processed_data_base_path = base_dir / 'data/processed_data'
     artifacts_dir = base_dir / 'artifacts'

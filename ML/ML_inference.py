@@ -1,3 +1,11 @@
+"""
+This script fetches historical cryptocurrency price data from the Binance API,
+processes it, and uses trained machine learning models to predict the next day's 
+closing prices for Bitcoin (BTC) and Ethereum (ETH). The predictions are logged 
+and displayed in the console.
+
+"""
+
 import pandas as pd
 import pickle
 import warnings
@@ -9,26 +17,34 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
-#----------------------------Logging Configuration-----------------------------------------
+# ================================== Logging Configuration ==================================
 logging.basicConfig(
-    filename="predictions.log",
+    filename="ML/predictions.log",
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-#----------------------------Model and Scaler Loading Functions-----------------------------------------
+# ========================== Model and Scaler Loading Functions ============================
 def load_model(model_path):
+    """
+    Load the trained model from the given path.
+    """
     with open(model_path, "rb") as f:
         model = pickle.load(f)
     return model
 
 def load_scaler(scaler_path):
+    """
+    Load the MinMaxScaler from the given path.
+    """
     with open(scaler_path, "rb") as f:
         scaler = pickle.load(f)
     return scaler
 
-#----------------------------Data Fetching, Processing, and Prediction Functions-----------------------------------------
+# =================== Data Fetching, Processing, and Prediction Functions ===================
+
 def get_data(symbol, interval='1d', start_date="2023-01-01", end_date="2025-02-06", limit=1000):
+
     url = f'https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}'
     
     if start_date:
@@ -46,6 +62,8 @@ def get_data(symbol, interval='1d', start_date="2023-01-01", end_date="2025-02-0
     if not data:
         raise Exception("No data returned from Binance API.")
     
+    # ================= Convert API response to DataFrame ==================
+
     df = pd.DataFrame(data, columns=[
         'timestamp', 'open', 'high', 'low', 'close', 'volume',
         'close_time', 'quote_asset_volume', 'number_of_trades',
@@ -56,40 +74,39 @@ def get_data(symbol, interval='1d', start_date="2023-01-01", end_date="2025-02-0
     df.set_index('timestamp', inplace=True)
     df.drop(columns=['close_time', 'ignore'], inplace=True)
     
-    # Convert relevant columns to numeric
+    # =============== Convert necessary columns to numeric =================
+
     numeric_cols = ['open', 'high', 'low', 'close', 'volume',
                     'quote_asset_volume', 'number_of_trades',
                     'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume']
     df[numeric_cols] = df[numeric_cols].astype(float)
 
-    # Add new features used during training
     df['price_range'] = df['high'] - df['low']
     df['close_to_open'] = df['close'] - df['open']
 
     return df
 
 def process_input_data(df, scaler):
+
     features = ['open', 'high', 'low', 'volume', 'quote_asset_volume',
                 'number_of_trades', 'taker_buy_base_asset_volume',
                 'taker_buy_quote_asset_volume', 'price_range', 'close_to_open']
     
-    latest_data = df[features].iloc[-1, :].values.reshape(1, -1)
-
-    df = df[features]
-    latest_data_df = pd.DataFrame([df.iloc[-1]], columns=df.columns)
+    latest_data_df = pd.DataFrame([df[features].iloc[-1]], columns=features)
     
     scaled_data = scaler.transform(latest_data_df)
 
     return scaled_data
 
 def predict_close_price(model, scaler, input_data):
+
     processed_data = process_input_data(input_data, scaler)
     prediction = model.predict(processed_data)
     return prediction[0]
 
-# Main function
+# ================================== Main Execution Block ==================================
 if __name__ == "__main__":
-    artifacts_dir = Path('artifacts')
+    artifacts_dir = Path('ML/artifacts')
     model_dir = artifacts_dir / 'model'
     scaler_dir = artifacts_dir / 'scaler'
     
@@ -107,9 +124,6 @@ if __name__ == "__main__":
     btc_scaler = load_scaler(btc_scaler_path)
     eth_scaler = load_scaler(eth_scaler_path)
 
-    expected_features = btc_scaler.feature_names_in_  
-    print(expected_features)
-
     btc_input_data = get_data(symbol='BTCUSDT', interval='1d')
     eth_input_data = get_data(symbol='ETHUSDT', interval='1d')
 
@@ -119,5 +133,6 @@ if __name__ == "__main__":
     print(f"Predicted Bitcoin Closing Price (Next Day): {btc_prediction}")
     print(f"Predicted Ethereum Closing Price (Next Day): {eth_prediction}")
 
+    # ============================== Log predictions ==============================
     logging.info(f"BTCUSDT Next Day Prediction: {btc_prediction}")
     logging.info(f"ETHUSDT Next Day Prediction: {eth_prediction}")
