@@ -9,7 +9,9 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.preprocessing import MinMaxScaler
 import pickle
 
-# ===================== Define Model Classes at Module Level =====================
+# -----------------------------------------
+# Define Model Classes at Module Level
+# -----------------------------------------
 class SimpleRNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers=1):
         super(SimpleRNN, self).__init__()
@@ -39,15 +41,18 @@ class SimpleLSTM(nn.Module):
         out = self.fc(out[:, -1, :])
         return out
 
-# ===================== Train Model Function =====================
+# -----------------------------------------
+# Train Model Function
+# -----------------------------------------
 def train_model(data_path, model_path, scaler_path, model_type='rnn', coin=None):
     data_path = Path(data_path)
     model_path = Path(model_path)
     scaler_path = Path(scaler_path)
 
-    # Use the provided coin symbol if available; otherwise, extract from the filename.
+    # -----------------------------------------
+    # Extract coin symbol from filename if not provided
+    # -----------------------------------------
     if coin is None:
-        # Assumes file name format: "symbol_interval_processed.csv"
         coin_symbol = data_path.stem.split('_')[0].upper()
     else:
         coin_symbol = coin
@@ -61,20 +66,25 @@ def train_model(data_path, model_path, scaler_path, model_type='rnn', coin=None)
             ys.append(y_data[i+seq_length])
         return np.array(xs), np.array(ys)
 
-    # ===================== Data Preparation =====================
-    # Define features and target
+    # -----------------------------------------
+    # Data Preparation
+    # -----------------------------------------
     x_cols = ['open', 'high', 'low', 'volume', 
               'quote_asset_volume', 'number_of_trades', 
               'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume']
     y_col = 'target'
 
+    # -----------------------------------------
     # Scale the data
+    # -----------------------------------------
     x_scaler = MinMaxScaler()
     y_scaler = MinMaxScaler()
     df[x_cols] = x_scaler.fit_transform(df[x_cols])
     df[[y_col]] = y_scaler.fit_transform(df[[y_col]])
 
+    # -----------------------------------------
     # Create sequences
+    # -----------------------------------------
     sequence_length = 10
     X_data = df[x_cols].values
     y_data = df[y_col].values
@@ -84,7 +94,9 @@ def train_model(data_path, model_path, scaler_path, model_type='rnn', coin=None)
     X_tensor = torch.tensor(X_seq, dtype=torch.float32)
     y_tensor = torch.tensor(y_seq, dtype=torch.float32)
 
-    # Split data (80% train, 20% test)
+    # -----------------------------------------
+    # Split data into training and testing sets
+    # -----------------------------------------
     train_size = int(0.8 * len(X_tensor))
     X_train, X_test = X_tensor[:train_size], X_tensor[train_size:]
     y_train, y_test = y_tensor[:train_size], y_tensor[train_size:]
@@ -96,7 +108,9 @@ def train_model(data_path, model_path, scaler_path, model_type='rnn', coin=None)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    # ===================== Model Initialization =====================
+    # -----------------------------------------
+    # Model Initialization
+    # -----------------------------------------
     input_size = len(x_cols)
     hidden_size = 64
     output_size = 1
@@ -116,7 +130,9 @@ def train_model(data_path, model_path, scaler_path, model_type='rnn', coin=None)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    # ===================== Training Loop =====================
+    # -----------------------------------------
+    # Training Loop
+    # -----------------------------------------
     best_test_loss = float('inf')
     best_model_state = None
 
@@ -135,7 +151,9 @@ def train_model(data_path, model_path, scaler_path, model_type='rnn', coin=None)
         
         avg_train_loss = total_train_loss / len(train_loader)
         
+        # -----------------------------------------
         # Testing phase
+        # -----------------------------------------
         model.eval()
         total_test_loss = 0
         with torch.no_grad():
@@ -147,47 +165,26 @@ def train_model(data_path, model_path, scaler_path, model_type='rnn', coin=None)
         
         avg_test_loss = total_test_loss / len(test_loader)
         
-        # Save best model state if current epoch's test loss is lower
         if avg_test_loss < best_test_loss:
             best_test_loss = avg_test_loss
             best_model_state = model.state_dict()
 
-    # ===================== Final Evaluation =====================
+    # -----------------------------------------
+    # Final Evaluation
+    # -----------------------------------------
     model.load_state_dict(best_model_state)
     model.eval()
-    predictions, actuals = [], []
-    with torch.no_grad():
-        for batch_X, batch_y in test_loader:
-            batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-            outputs = model(batch_X)
-            predictions.extend(outputs.cpu().numpy())
-            actuals.extend(batch_y.cpu().numpy())
     
-    predictions = np.array(predictions)
-    actuals = np.array(actuals)
-    
-    # Inverse transform predictions and actual values
-    predictions = y_scaler.inverse_transform(predictions.reshape(-1, 1)).squeeze()
-    actuals = y_scaler.inverse_transform(actuals.reshape(-1, 1)).squeeze()
-    
-    # Calculate and display metrics
-    mae = mean_absolute_error(actuals, predictions)
-    rmse = np.sqrt(mean_squared_error(actuals, predictions))
-    print(f'\nFinal Metrics for {model_type.upper()} model on {coin_symbol}:')
-    print(f'Mean Absolute Error: {mae:.2f}')
-    print(f'Root Mean Squared Error: {rmse:.2f}')
-
-    # ===================== Save Model and Scalers =====================
-    # Ensure the model is saved with a '.pth' extension
+    # -----------------------------------------
+    # Save Model and Scalers
+    # -----------------------------------------
     if model_path.suffix != '.pth':
         model_path = model_path.with_suffix('.pth')
     torch.save(model, model_path)
     
-    # Ensure the scaler file is saved with a '.pkl' extension
     if scaler_path.suffix != '.pkl':
         scaler_path = scaler_path.with_suffix('.pkl')
     
-    # Save both scalers in a dictionary
     scaler_dict = {'x_scaler': x_scaler, 'y_scaler': y_scaler}
     with open(scaler_path, 'wb') as f:
         pickle.dump(scaler_dict, f)
