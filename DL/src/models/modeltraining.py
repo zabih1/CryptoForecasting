@@ -10,7 +10,7 @@ from sklearn.preprocessing import MinMaxScaler
 import pickle
 
 # -----------------------------------------
-# Define Model Classes at Module Level
+# Define Model Classes (SimpleRNN, SimpleLSTM)
 # -----------------------------------------
 class SimpleRNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers=1):
@@ -49,9 +49,7 @@ def train_model(data_path, model_path, scaler_path, model_type='rnn', coin=None)
     model_path = Path(model_path)
     scaler_path = Path(scaler_path)
 
-    # -----------------------------------------
-    # Extract coin symbol from filename if not provided
-    # -----------------------------------------
+   
     if coin is None:
         coin_symbol = data_path.stem.split('_')[0].upper()
     else:
@@ -59,6 +57,9 @@ def train_model(data_path, model_path, scaler_path, model_type='rnn', coin=None)
 
     df = pd.read_csv(data_path)
 
+    # -----------------------------------------
+    # Create Sequences Function
+    # -----------------------------------------
     def create_sequences(X_data, y_data, seq_length):
         xs, ys = [], []
         for i in range(len(X_data) - seq_length):
