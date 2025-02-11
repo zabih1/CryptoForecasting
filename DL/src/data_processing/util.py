@@ -38,9 +38,9 @@ def get_data(symbol, interval='1d', start_date=None, end_date=None, limit=1000):
         'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
     ])
 
-    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-    df.set_index('timestamp', inplace=True)
-    df.drop(columns=['close_time', 'ignore'], inplace=True)
+    # df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+    # df.set_index('timestamp', inplace=True)
+    # df.drop(columns=['close_time', 'ignore'], inplace=True)
     
     return df
 

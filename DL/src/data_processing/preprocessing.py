@@ -1,7 +1,8 @@
 """
 This script loads raw cryptocurrency market data from a CSV file, processes it 
-by adding new features (price range, close-to-open difference, and target variable), 
-and saves the processed data as a new CSV file.
+by performing data cleaning and feature engineering (calculating average price, 
+price change, and the next period's closing price as the target), and saves the 
+processed data as a new CSV file.
 """
 
 import os
@@ -9,17 +10,7 @@ import pandas as pd
 
 # ===================== Load Raw Data =====================
 def load_raw_data(base_path, symbol, interval):
-    """
-    Load raw market data from a CSV file.
 
-    Parameters:
-        base_path (str): Directory where the raw data CSV file is stored.
-        symbol (str): Cryptocurrency pair (e.g., 'BTCUSDT').
-        interval (str): Time interval for candlestick data (e.g., '1d', '1h').
-
-    Returns:
-        pd.DataFrame: A DataFrame containing the loaded market data.
-    """
     filename = f"{symbol.lower()}_{interval}.csv"
     path = os.path.join(base_path, filename)
     if not os.path.exists(path):
@@ -28,42 +19,45 @@ def load_raw_data(base_path, symbol, interval):
 
 # ===================== Process Data =====================
 def process_data(df):
-    """
-    Process raw market data by converting columns to numeric values,
-    adding new features, and creating a target variable.
 
-    Parameters:
-        df (pd.DataFrame): The raw market data DataFrame.
-
-    Returns:
-        pd.DataFrame: The processed DataFrame with new features and target variable.
-    """
-    df = df.apply(pd.to_numeric, errors='coerce')
+    columns_to_drop = ["ignore", "timestamp", "close_time"]
+    df = df.drop(columns=[col for col in columns_to_drop if col in df.columns], errors="ignore")
     
-    df['price_range'] = df['high'] - df['low']
-    df['close_to_open'] = df['close'] - df['open']
-    df['target'] = df['close'].shift(-1)  # Next day's closing price as target
-
+    numeric_columns = [
+        "open", "high", "low", "close", "volume",
+        "quote_asset_volume", "number_of_trades",
+        "taker_buy_base_asset_volume", "taker_buy_quote_asset_volume"
+    ]
+    # Only process columns that actually exist in the DataFrame
+    existing_numeric_columns = [col for col in numeric_columns if col in df.columns]
+    df[existing_numeric_columns] = df[existing_numeric_columns].apply(pd.to_numeric, errors="coerce")
+    
+    # Drop rows with any missing values
     df = df.dropna()
+    
+    if not df.empty:
+        # Create new features
+        df["average_price"] = (df["high"] + df["low"]) / 2
+        df["price_change"] = df["close"] - df["open"]
+        df["target_close"] = df["close"].shift(-1)  # Next period's closing price
+        
+        # Drop any rows with missing values (which may be introduced by shifting)
+        df = df.dropna()
+        
+        # Drop columns that are no longer needed
+        df = df.drop(columns=["close"], errors="ignore")
+    
+    # Reset the index
+    df = df.reset_index(drop=True)
     
     return df
 
 # ===================== Save Processed Data =====================
 def save_processed_data(df, base_path, symbol, interval):
-    """
-    Save the processed market data to a CSV file.
 
-    Parameters:
-        df (pd.DataFrame): The processed market data DataFrame.
-        base_path (str): Directory where the processed data CSV file will be saved.
-        symbol (str): Cryptocurrency pair (e.g., 'BTCUSDT').
-        interval (str): Time interval for candlestick data (e.g., '1d', '1h').
-
-    Returns:
-        str: The file path where the processed CSV is saved.
-    """
     filename = f"{symbol.lower()}_{interval}_processed.csv"
     path = os.path.join(base_path, filename)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     df.to_csv(path, index=False)
     return path
+

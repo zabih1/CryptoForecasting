@@ -90,7 +90,7 @@ if __name__ == "__main__":
     scaler_dir.mkdir(parents=True, exist_ok=True)
     
     # Define coin symbol ("ETHUSDT" or "BTCUSDT")
-    symbol = "ETHUSDT"
+    symbol = "BTCUSDT"
     
     if symbol.upper() == "BTCUSDT":
         rnn_model_path = model_dir / "btcusdt_1d_rnn_model.pth"
