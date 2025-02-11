@@ -1,6 +1,7 @@
 # ================================================================
 # 📌 Import Required Libraries
 # ================================================================
+
 import pandas as pd
 import numpy as np
 import torch
@@ -18,18 +19,22 @@ import pickle
 class SimpleRNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers=1):
         super(SimpleRNN, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
         self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.rnn(x, h0)
-        return self.fc(out[:, -1, :])
-
+        out = self.fc(out[:, -1, :])
+        return out
 
 class SimpleLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers=1):
         super(SimpleLSTM, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
 
@@ -37,92 +42,181 @@ class SimpleLSTM(nn.Module):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.lstm(x, (h0, c0))
-        return self.fc(out[:, -1, :])
-
+        out = self.fc(out[:, -1, :])
+        return out
 
 # ================================================================
 # 📌 Train Model Function
 # ================================================================
 def train_model(data_path, model_path, scaler_path, model_type='rnn', coin=None):
-    data_path, model_path, scaler_path = map(Path, [data_path, model_path, scaler_path])
+    data_path = Path(data_path)
+    model_path = Path(model_path)
+    scaler_path = Path(scaler_path)
+
+    if coin is None:
+        coin_symbol = data_path.stem.split('_')[0].upper()
+    else:
+        coin_symbol = coin
 
     df = pd.read_csv(data_path)
 
-    x_cols = ["open", "high", "low", "volume", "quote_asset_volume",
-              "number_of_trades", "taker_buy_base_asset_volume", "average_price", "price_change"]
+    x_cols =    [ "open", "high", "low", "volume","quote_asset_volume","number_of_trades",
+                 "taker_buy_base_asset_volume", "average_price", "price_change"
+    ]
+
     y_col = 'target_close'
-
+    
     sequence_length = 30
+
     train_split_index = int(0.8 * len(df))
+    
 
-    x_scaler, y_scaler = MinMaxScaler(), MinMaxScaler()
-    x_scaler.fit(df.iloc[:train_split_index][x_cols])
-    y_scaler.fit(df.iloc[:train_split_index][[y_col]])
-
+    x_scaler = MinMaxScaler()
+    y_scaler = MinMaxScaler()
+    
+    train_df = df.iloc[:train_split_index]
+    x_scaler.fit(train_df[x_cols])
+    y_scaler.fit(train_df[[y_col]])
+    
     df[x_cols] = x_scaler.transform(df[x_cols])
     df[[y_col]] = y_scaler.transform(df[[y_col]])
-
-    # 🔄 Create Sequences
-    def create_sequences(X, y, seq_length):
-        return np.array([X[i:i + seq_length] for i in range(len(X) - seq_length)]), \
-               np.array([y[i + seq_length] for i in range(len(y) - seq_length)])
-
-    X_data, y_data = df[x_cols].values, df[y_col].values
+    
+    # ================================================================
+    # Create Sequences Function
+    # ================================================================
+    def create_sequences(X_data, y_data, seq_length):
+        xs, ys = [], []
+        for i in range(len(X_data) - seq_length):
+            xs.append(X_data[i:i+seq_length])
+            ys.append(y_data[i+seq_length])
+        return np.array(xs), np.array(ys)
+    
+    X_data = df[x_cols].values
+    y_data = df[y_col].values
     X_seq, y_seq = create_sequences(X_data, y_data, sequence_length)
-
-    train_size = train_split_index - sequence_length
-    X_train, y_train = X_seq[:train_size], y_seq[:train_size]
-    X_test, y_test = X_seq[train_size:], y_seq[train_size:]
-
-    X_train, y_train = map(torch.tensor, (X_train, y_train))
-    X_test, y_test = map(torch.tensor, (X_test, y_test))
-
+    
+    train_seq_count = train_split_index - sequence_length
+    X_train = X_seq[:train_seq_count]
+    y_train = y_seq[:train_seq_count]
+    X_test = X_seq[train_seq_count:]
+    y_test = y_seq[train_seq_count:]
+    
+    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+    y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
+    X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
+    y_test_tensor = torch.tensor(y_test, dtype=torch.float32)
+    
     batch_size = 64
-    train_loader = DataLoader(TensorDataset(X_train.float(), y_train.float()), batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(TensorDataset(X_test.float(), y_test.float()), batch_size=batch_size, shuffle=False)
-
+    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+    test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    
+    # ================================================================
+    # Model and Training Parameters 
+    # ================================================================
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model_cls = SimpleRNN if model_type == 'rnn' else SimpleLSTM
-    model = model_cls(len(x_cols), 128, 1, num_layers=1).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.003 if model_type == 'rnn' else 0.001)
+    
+    if model_type == 'rnn':
+        input_size = len(x_cols)
+        hidden_size = 128
+        output_size = 1
+        num_layers = 1
+        learning_rate = 0.003
+        num_epochs = 130
+        model = SimpleRNN(input_size, hidden_size, output_size, num_layers).to(device)
+
+    elif model_type == 'lstm':
+        input_size = len(x_cols)
+        hidden_size = 128
+        output_size = 1
+        num_layers = 1
+        learning_rate = 0.001
+        num_epochs = 10
+        model = SimpleLSTM(input_size, hidden_size, output_size, num_layers).to(device)
+    else:
+        raise ValueError("Invalid model type. Choose either 'rnn' or 'lstm'.")
+    
     criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    
+    # ================================================================
+    # Training Loop
+    # ================================================================
+    best_test_loss = float('inf')
+    best_model_state = None
 
-    # =======================================
-    #          🚀 Training Loop
-    # =======================================
-
-    best_model_state, best_loss = None, float('inf')
-
-    for epoch in range(10 if model_type == 'lstm' else 130):
+    print(f"Training {model_type.upper()} model for {coin_symbol} on {device}")
+    for epoch in range(num_epochs):
         model.train()
-        train_loss = sum(criterion(model(batch_X.to(device)).squeeze(), batch_y.to(device)).item()
-                         for batch_X, batch_y in train_loader) / len(train_loader)
-
+        total_train_loss = 0
+        for batch_X, batch_y in train_loader:
+            batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+            optimizer.zero_grad()
+            outputs = model(batch_X).squeeze()
+            loss = criterion(outputs, batch_y)
+            loss.backward()
+            optimizer.step()
+            total_train_loss += loss.item()
+        
+        avg_train_loss = total_train_loss / len(train_loader)
+        
+        # ================================================================
+        # Testing Phase (Compute Loss)
+        # ================================================================
         model.eval()
-        test_loss = sum(criterion(model(batch_X.to(device)).squeeze(), batch_y.to(device)).item()
-                        for batch_X, batch_y in test_loader) / len(test_loader)
-
-        if test_loss < best_loss:
-            best_loss, best_model_state = test_loss, model.state_dict()
-
+        total_test_loss = 0
+        with torch.no_grad():
+            for batch_X, batch_y in test_loader:
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                outputs = model(batch_X).squeeze()
+                loss = criterion(outputs, batch_y)
+                total_test_loss += loss.item()
+        avg_test_loss = total_test_loss / len(test_loader)
+        
+        # Save best model state
+        if avg_test_loss < best_test_loss:
+            best_test_loss = avg_test_loss
+            best_model_state = model.state_dict()
+    
+    # ================================================================
+    # Final Evaluation & Compute Metrics
+    # ================================================================
     model.load_state_dict(best_model_state)
-    torch.save(model.state_dict(), model_path.with_suffix('.pth'))
-    with open(scaler_path.with_suffix('.pkl'), 'wb') as f:
-        pickle.dump({'x_scaler': x_scaler, 'y_scaler': y_scaler}, f)
-
-    # =======================================
-    #           📊 Evaluate Model
-    # =======================================
     model.eval()
-    preds, targets = [], []
 
+    all_preds = []
+    all_targets = []
     with torch.no_grad():
         for batch_X, batch_y in test_loader:
-            preds.append(model(batch_X.to(device)).squeeze().cpu().numpy())
-            targets.append(batch_y.cpu().numpy())
+            batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+            preds = model(batch_X).squeeze()
+            all_preds.append(preds.cpu().numpy())
+            all_targets.append(batch_y.cpu().numpy())
 
-    preds, targets = np.concatenate(preds), np.concatenate(targets)
-    preds, targets = y_scaler.inverse_transform(preds.reshape(-1, 1)), y_scaler.inverse_transform(targets.reshape(-1, 1))
+    all_preds = np.concatenate(all_preds)
+    all_targets = np.concatenate(all_targets)
 
-    print(f"\nRMSE: {np.sqrt(mean_squared_error(targets, preds)):.4f}")
-    print(f"MAE: {mean_absolute_error(targets, preds):.4f}")
+    # Inverse transform to original scale (reshape to 2D for scaler)
+    all_preds_inv = y_scaler.inverse_transform(all_preds.reshape(-1, 1))
+    all_targets_inv = y_scaler.inverse_transform(all_targets.reshape(-1, 1))
+    
+    rmse = np.sqrt(mean_squared_error(all_targets_inv, all_preds_inv))
+    mae = mean_absolute_error(all_targets_inv, all_preds_inv)
+
+    print(f"\nRMSE: {rmse:.4f}")
+    print(f"MAE: {mae:.4f}")
+    
+    # ================================================================
+    # Save Model and Scalers
+    # ================================================================
+    if model_path.suffix != '.pth':
+        model_path = model_path.with_suffix('.pth')
+    torch.save(model, model_path)
+    
+    if scaler_path.suffix != '.pkl':
+        scaler_path = scaler_path.with_suffix('.pkl')
+    
+    scaler_dict = {'x_scaler': x_scaler, 'y_scaler': y_scaler}
+    with open(scaler_path, 'wb') as f:
+        pickle.dump(scaler_dict, f)
