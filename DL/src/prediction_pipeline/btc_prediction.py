@@ -56,7 +56,7 @@ def btc_prediction_pipeline(symbol, interval, start_date, end_date):
     processed_data_path = save_processed_data(processed_data, processed_data_base_path, symbol, interval)
 
     # ===================== Train and Save Models =====================
-    models = ["rnn", "lstm"]
+    models = ["rnn", "lstm", "lgbm"]
     for model_type in models:
         # Define the paths for model and scaler
         model_file_name = f"{symbol.lower()}_{interval}_{model_type}_model.pkl"

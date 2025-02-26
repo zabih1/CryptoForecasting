@@ -1,13 +1,4 @@
 import warnings
-# -----------------------------------------
-# Suppress torch.load FutureWarning
-# -----------------------------------------
-warnings.filterwarnings(
-    "ignore", 
-    message="You are using `torch.load` with `weights_only=False`", 
-    category=FutureWarning
-)
-
 import requests
 import pandas as pd
 import numpy as np
@@ -16,18 +7,18 @@ import pickle
 from pathlib import Path
 import logging
 
-# -----------------------------------------
-# Logging Configuration
-# -----------------------------------------
+warnings.filterwarnings(
+    "ignore", 
+    message="You are using `torch.load` with `weights_only=False`", 
+    category=FutureWarning
+)
+
 logging.basicConfig(
     filename="DL/predictions.log",
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-# -----------------------------------------
-# Load Model and Scalers Functions
-# -----------------------------------------
 def load_torch_model(model_path):
     model = torch.load(model_path, map_location=torch.device('cpu'))
     model.eval()
@@ -38,9 +29,6 @@ def load_scalers(scaler_path):
         scaler_dict = pickle.load(f)
     return scaler_dict["x_scaler"], scaler_dict["y_scaler"]
 
-# -----------------------------------------
-# Data Fetching Function
-# -----------------------------------------
 def get_data(symbol, interval='1d', start_date=None, end_date=None, limit=1000):
     url = f'https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}'
     if start_date:
@@ -64,32 +52,28 @@ def get_data(symbol, interval='1d', start_date=None, end_date=None, limit=1000):
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
     df.set_index('timestamp', inplace=True)
     df.drop(columns=['close_time', 'ignore'], inplace=True)
+
     numeric_cols = ['open', 'high', 'low', 'close', 'volume',
                     'quote_asset_volume', 'number_of_trades',
                     'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume']
+    
     df[numeric_cols] = df[numeric_cols].astype(float)
     return df
 
-# -----------------------------------------
-# Create Sequence Input for Models
-# -----------------------------------------
 def create_sequence_input(df, features, sequence_length):
     if len(df) < sequence_length:
         raise Exception("Not enough data to create sequence input.")
     sequence_data = df[features].tail(sequence_length).values
     return sequence_data
 
-# -----------------------------------------
-# Main Execution Block
-# -----------------------------------------
 if __name__ == "__main__":
+    
     artifacts_dir = Path('DL/artifacts')
     model_dir = artifacts_dir / 'model'
     scaler_dir = artifacts_dir / 'scaler'
     model_dir.mkdir(parents=True, exist_ok=True)
     scaler_dir.mkdir(parents=True, exist_ok=True)
     
-    # Define coin symbol ("ETHUSDT" or "BTCUSDT")
     symbol = "BTCUSDT"
     
     if symbol.upper() == "BTCUSDT":
@@ -109,37 +93,31 @@ if __name__ == "__main__":
     
     df = get_data(symbol=symbol, interval='1d', start_date='2022-06-01', end_date='2025-02-06', limit=1000)
     
+    df['average_price'] = (df["high"] + df["low"]) / 2
+    df['price_change'] = df["close"] - df["open"]
+    
     feature_columns = [
         'open', 'high', 'low', 'volume', 
         'quote_asset_volume', 'number_of_trades', 
-        'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume'
+        'taker_buy_base_asset_volume', 'average_price', 'price_change'
     ]
     sequence_length = 30
     
-    # Create and scale input sequence
     sequence_data = create_sequence_input(df, feature_columns, sequence_length)
     sequence_df = pd.DataFrame(sequence_data, columns=feature_columns)
     scaled_sequence = features_scaler.transform(sequence_df)
     input_tensor = torch.tensor(scaled_sequence, dtype=torch.float32).unsqueeze(0)
     
-    # -----------------------------------------
-    # Make Predictions with RNN and LSTM Models
-    # -----------------------------------------
     with torch.no_grad():
         rnn_prediction = rnn_model(input_tensor)
         lstm_prediction = lstm_model(input_tensor)
     
-    # Inverse-transform model outputs to original scale
     rnn_pred_original = target_scaler.inverse_transform(rnn_prediction.cpu().numpy().reshape(-1, 1))
     lstm_pred_original = target_scaler.inverse_transform(lstm_prediction.cpu().numpy().reshape(-1, 1))
     
-    # Extract predicted close prices
     rnn_close_price = rnn_pred_original[0, 0]
     lstm_close_price = lstm_pred_original[0, 0]
     
-    # -----------------------------------------
-    # Output Predictions and Log Results
-    # -----------------------------------------
     print(f"{symbol} RNN Model Prediction for next day's close: {rnn_close_price}")
     print(f"{symbol} LSTM Model Prediction for next day's close: {lstm_close_price}")
     logging.info(f"{symbol} Next Day Prediction (RNN): {rnn_close_price}")
